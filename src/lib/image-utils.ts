@@ -511,41 +511,28 @@ export async function mergeCustom(
 
   const getImageData = (id: string) => imageData.find(d => d.id === id)!;
 
-  // 步骤1: 以所有图片 naturalHeight 的最大值为初始基准估算各行宽度
-  const maxNaturalHeight = Math.max(...imageData.map(d => d.naturalHeight));
-  
-  const rowWidths = rows.map(row => {
-    const rowHeight = maxNaturalHeight;
-    let totalWidth = 0;
-    row.forEach((imgId, index) => {
-      const data = getImageData(imgId);
-      const scaledWidth = rowHeight * data.aspectRatio;
-      totalWidth += scaledWidth;
-      if (index < row.length - 1) {
-        totalWidth += gap; // 添加间隙
-      }
-    });
-    return totalWidth;
-  });
-
-  // 步骤2: 取最大行宽作为最终基准总宽度
-  const baseTotalWidth = Math.max(...rowWidths);
-
-  // 步骤3: 按照"基准总宽度 / 该行所有图片宽高比之和"反推每行的行高
-  const rowHeights = rows.map(row => {
-    const totalAspectRatio = row.reduce((sum, imgId) => {
-      return sum + getImageData(imgId).aspectRatio;
-    }, 0);
-    // 总宽度 = 行高 * 宽高比之和 + 间隙
-    // 行高 = (总宽度 - 间隙) / 宽高比之和
-    const totalGap = (row.length - 1) * gap;
-    return (baseTotalWidth - totalGap) / totalAspectRatio;
-  });
-
-  // 使用内缩进方式：canvas增加边缘间隙，与模版模式一致
   const halfGap = gap / 2;
 
-  // 计算每行的列宽（用于计算canvas宽度和绘制位置）
+  // 第一步：估算基准总宽度
+  // baseTotalWidth = 最宽那行的内容宽度+列间隙
+  const maxNaturalHeight = Math.max(...imageData.map(d => d.naturalHeight));
+  const baseTotalWidth = Math.max(...rows.map(row => {
+    const totalAspectRatio = row.reduce((sum, imgId) => sum + getImageData(imgId).aspectRatio, 0);
+    return maxNaturalHeight * totalAspectRatio + (row.length - 1) * gap;
+  }));
+
+  // canvasWidth 先用 baseTotalWidth + gap 估算
+  const estimatedCanvasWidth = baseTotalWidth + gap;
+
+  // 第二步：计算每行的行高
+  // 每行行高 = (estimatedCanvasWidth - halfGap*2 - (该行列数-1)*gap) / 该行所有图片宽高比之和
+  const rowHeights = rows.map(row => {
+    const totalAspectRatio = row.reduce((sum, imgId) => sum + getImageData(imgId).aspectRatio, 0);
+    return (estimatedCanvasWidth - halfGap * 2 - (row.length - 1) * gap) / totalAspectRatio;
+  });
+
+  // 第三步：计算 canvas 尺寸
+  // 先计算每行中每张图片的宽度
   const rowColumnWidths = rows.map((row, rowIndex) => {
     const rowHeight = rowHeights[rowIndex];
     return row.map(imgId => {
@@ -554,16 +541,14 @@ export async function mergeCustom(
     });
   });
 
-  // 计算canvas总宽度和总高度（按照用户给出的正确公式）
-  // canvas总宽度 = 所有列宽之和 + (列数-1)*gap + gap（左右各halfGap）
-  // 需要找出列数最多的那一行，以确定canvas宽度
-  const maxColumnTotalWidth = Math.max(...rowColumnWidths.map(widths =>
-    widths.reduce((sum, w) => sum + w, 0)
-  ));
-  const maxColCount = rows.length > 0 ? Math.max(...rows.map(row => row.length)) : 0;
-  const canvasWidth = Math.ceil(maxColumnTotalWidth + (maxColCount - 1) * gap + gap);
+  // canvasWidth = max(各行: 该行所有图片宽度之和 + (该行列数-1)*gap) + gap
+  const canvasWidth = Math.ceil(Math.max(...rows.map((row, rowIndex) => {
+    const widths = rowColumnWidths[rowIndex];
+    const contentWidth = widths.reduce((sum, w) => sum + w, 0);
+    return contentWidth + (row.length - 1) * gap;
+  })) + gap);
 
-  // canvas总高度 = 所有行高之和 + (行数-1)*gap + gap（上下各halfGap）
+  // canvasHeight = 所有行高之和 + (行数-1)*gap + gap
   const canvasHeight = Math.ceil(
     rowHeights.reduce((sum, h) => sum + h, 0) + (rows.length - 1) * gap + gap
   );
@@ -583,8 +568,8 @@ export async function mergeCustom(
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // 绘制图片 - 使用正确的计算公式
-  // 每张图片的绘制起始Y = halfGap + 该图片所在行之前所有行的高度之和 + 该图片所在行之前的行间隙数 × gap
+  // 第三步：绘制每张图片
+  // currentY 从 halfGap 开始，每行结束后 currentY += rowHeight + gap
   let currentY = halfGap;
 
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
@@ -592,27 +577,26 @@ export async function mergeCustom(
     const rowHeight = rowHeights[rowIndex];
     const colWidths = rowColumnWidths[rowIndex];
 
-    // 每张图片的绘制起始X = halfGap + 该图片所在列之前所有列的宽度之和 + 该图片所在列之前的列间隙数 × gap
+    // currentX 从 halfGap 开始，每行开始时重置为 halfGap
     let currentX = halfGap;
 
     for (let colIndex = 0; colIndex < row.length; colIndex++) {
       const imgId = row[colIndex];
       const data = getImageData(imgId);
-      const scaledWidth = colWidths[colIndex];
+      const imgWidth = colWidths[colIndex];
 
-      // 9参数 drawImage: 从原图完整像素区域绘制到目标区域
-      // 目标区域使用原始计算尺寸，不额外减去gap
+      // 每张图片绘制尺寸 = imgWidth × rowHeight，不额外减去任何值
       ctx.drawImage(
         data.img,
-        0, 0, data.naturalWidth, data.naturalHeight,  // 源图完整区域
-        currentX, currentY, scaledWidth, rowHeight     // 目标区域（不使用内缩进）
+        0, 0, data.naturalWidth, data.naturalHeight,
+        currentX, currentY, imgWidth, rowHeight
       );
 
-      // 移动到下一列：当前列宽度 + gap
-      currentX += scaledWidth + gap;
+      // 每张图片结束后 currentX += imgWidth + gap
+      currentX += imgWidth + gap;
     }
 
-    // 移动到下一行：当前行高度 + gap
+    // 每行结束后 currentY += rowHeight + gap
     currentY += rowHeight + gap;
   }
 
