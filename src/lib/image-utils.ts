@@ -634,16 +634,22 @@ export async function copyImageToClipboard(dataUrl: string): Promise<void> {
   if (!dataUrl || typeof dataUrl !== 'string') {
     throw new Error('Invalid image data URL');
   }
-  
+
   try {
-    const response = await fetch(dataUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
+    // 将 data URL 转换为 Blob，避免使用 fetch
+    const byteString = atob(dataUrl.split(',')[1]);
+    const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
     }
-    const blob = await response.blob();
-    
+
+    const blob = new Blob([ab], { type: mimeString });
+
     await navigator.clipboard.write([
-      new ClipboardItem({ [blob.type]: blob })
+      new ClipboardItem({ [mimeString]: blob })
     ]);
   } catch (error) {
     console.error('Copy to clipboard failed:', error);
