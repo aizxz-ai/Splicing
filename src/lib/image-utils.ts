@@ -544,10 +544,28 @@ export async function mergeCustom(
 
   // 使用内缩进方式：canvas增加边缘间隙，与模版模式一致
   const halfGap = gap / 2;
-  // 额外增加gap作为安全边距，确保四边留白对称且图片不被截断
-  const canvasWidth = Math.ceil(baseTotalWidth + gap * 2); // 左右各halfGap + 额外安全边距
+
+  // 计算每行的列宽（用于计算canvas宽度和绘制位置）
+  const rowColumnWidths = rows.map((row, rowIndex) => {
+    const rowHeight = rowHeights[rowIndex];
+    return row.map(imgId => {
+      const data = getImageData(imgId);
+      return rowHeight * data.aspectRatio;
+    });
+  });
+
+  // 计算canvas总宽度和总高度（按照用户给出的正确公式）
+  // canvas总宽度 = 所有列宽之和 + (列数-1)*gap + gap（左右各halfGap）
+  // 需要找出列数最多的那一行，以确定canvas宽度
+  const maxColumnTotalWidth = Math.max(...rowColumnWidths.map(widths =>
+    widths.reduce((sum, w) => sum + w, 0)
+  ));
+  const maxColCount = rows.length > 0 ? Math.max(...rows.map(row => row.length)) : 0;
+  const canvasWidth = Math.ceil(maxColumnTotalWidth + (maxColCount - 1) * gap + gap);
+
+  // canvas总高度 = 所有行高之和 + (行数-1)*gap + gap（上下各halfGap）
   const canvasHeight = Math.ceil(
-    rowHeights.reduce((sum, h) => sum + h, 0) + (rows.length - 1) * gap + gap * 2 // 上下各halfGap + 额外安全边距
+    rowHeights.reduce((sum, h) => sum + h, 0) + (rows.length - 1) * gap + gap
   );
 
   // 创建画布
@@ -565,28 +583,36 @@ export async function mergeCustom(
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // 绘制图片 - 使用内缩进方式，与模版模式一致
-  let currentY = halfGap; // 从顶部halfGap开始
-  
+  // 绘制图片 - 使用正确的计算公式
+  // 每张图片的绘制起始Y = halfGap + 该图片所在行之前所有行的高度之和 + 该图片所在行之前的行间隙数 × gap
+  let currentY = halfGap;
+
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
     const row = rows[rowIndex];
     const rowHeight = rowHeights[rowIndex];
-    let currentX = halfGap; // 从左侧halfGap开始
+    const colWidths = rowColumnWidths[rowIndex];
 
-    for (const imgId of row) {
+    // 每张图片的绘制起始X = halfGap + 该图片所在列之前所有列的宽度之和 + 该图片所在列之前的列间隙数 × gap
+    let currentX = halfGap;
+
+    for (let colIndex = 0; colIndex < row.length; colIndex++) {
+      const imgId = row[colIndex];
       const data = getImageData(imgId);
-      const scaledWidth = rowHeight * data.aspectRatio;
-      
-      // 9参数 drawImage: 从原图完整像素区域绘制（四周内缩进）
+      const scaledWidth = colWidths[colIndex];
+
+      // 9参数 drawImage: 从原图完整像素区域绘制到目标区域
+      // 目标区域使用原始计算尺寸，不额外减去gap
       ctx.drawImage(
         data.img,
         0, 0, data.naturalWidth, data.naturalHeight,  // 源图完整区域
-        currentX, currentY, scaledWidth - gap, rowHeight - gap     // 目标区域（内缩进）
+        currentX, currentY, scaledWidth, rowHeight     // 目标区域（不使用内缩进）
       );
 
+      // 移动到下一列：当前列宽度 + gap
       currentX += scaledWidth + gap;
     }
 
+    // 移动到下一行：当前行高度 + gap
     currentY += rowHeight + gap;
   }
 
