@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: #ffffff;
+  --color-foreground: #1a1a1a;
+  --color-sidebar-ring: #000000;
+  --color-sidebar-border: #f0f0f0;
+  --color-sidebar-accent-foreground: #1a1a1a;
+  --color-sidebar-accent: #f5f5f5;
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-primary: #000000;
+  --color-sidebar-foreground: #1a1a1a;
+  --color-sidebar: #ffffff;
+  --color-chart-5: #000000;
+  --color-chart-4: #10b981;
+  --color-chart-3: #34d399;
+  --color-chart-2: #6ee7b7;
+  --color-chart-1: #a7f3d0;
+  --color-ring: #000000;
+  --color-input: #e5e5e5;
+  --color-border: #e5e5e5;
+  --color-destructive: #ef4444;
+  --color-accent-foreground: #1a1a1a;
+  --color-accent: #f5f5f5;
+  --color-muted-foreground: #8e8e93;
+  --color-muted: #f5f5f5;
+  --color-secondary-foreground: #1a1a1a;
+  --color-secondary: #f5f5f5;
+  --color-primary-foreground: #ffffff;
+  --color-primary: #000000;
+  --color-popover-foreground: #1a1a1a;
+  --color-popover: #ffffff;
+  --color-card-foreground: #1a1a1a;
+  --color-card: #ffffff;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --font-sans:
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', ui-sans-serif,
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+
+  --radius: 8px;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
