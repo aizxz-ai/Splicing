@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, ArrowDown, Grid3x3, AlignVerticalJustifyCenter, LayoutGrid, Copy, Check, Download, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -968,5 +968,9 @@ function EditorContent() {
 }
 
 export default function EditorPage() {
-  return <EditorContent />;
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">加载中...</div>}>
+      <EditorContent />
+    </Suspense>
+  );
 }
